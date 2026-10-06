@@ -43,4 +43,5 @@ with that watch. It is made on first use and never leaves that file.
 | `WOKLA_BASE_URL` | `https://api.wokla.app` |
 | `WOKLA_VOICE` | `Meijia` (`say -v '?'` lists the rest) |
 | `WOKLA_LANGUAGE` | `zh-TW` |
+| `WOKLA_MAX_CHARS` | `300` characters at most per message sent; also the ceiling, since the server refuses longer |
 | `WOKLA_INTERVAL` | `10` seconds between polls while listening; anything below 2 is raised to 2 |

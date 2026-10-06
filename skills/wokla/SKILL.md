@@ -44,6 +44,11 @@ it, paste it, or commit it.
    wrist: one or two short sentences, in the language they used, no
    markdown, no lists. A long answer belongs in this terminal, with a short
    line on the watch saying so.
+
+   `wokla send` refuses anything over `WOKLA_MAX_CHARS` characters (300 by
+   default) and sends nothing. When it says "say it shorter", rewrite the
+   reply to fit and send again. Do not split it across several messages:
+   the watch keeps only the latest, so every one but the last is lost.
 3. Then `wokla seen <created_at>`, naming the message you read.
 4. Tell the user what was said and what you sent.
 
