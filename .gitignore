@@ -1,0 +1,4 @@
+# The device key lives in ~/.config/wokla, never here. Belt and braces.
+key
+*.m4a
+.DS_Store

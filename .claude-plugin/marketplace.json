@@ -1,0 +1,14 @@
+{
+  "name": "wokla",
+  "owner": {
+    "name": "Falcon"
+  },
+  "plugins": [
+    {
+      "name": "wokla-plugin",
+      "source": "./",
+      "description": "Pair a Claude session with a Wokla watch."
+    }
+  ],
+  "description": "Claude Code plugins for Wokla watches."
+}

@@ -1,0 +1,170 @@
+#!/bin/bash
+# wokla — a Claude session as the other end of a Wokla watch.
+#
+#   wokla pair <code>        join the 5-digit code the watch is showing
+#   wokla code               ask for a code to type on the watch instead
+#   wokla status             the pair status, as JSON
+#   wokla listen             poll every 10s; one line per message waiting
+#   wokla send "<text>"      send words; spoken instead if the server
+#                            does not take words alone yet
+#   wokla say "<text>"       speak the text and send the recording
+#   wokla seen <created_at>  report that message as read
+#   wokla fetch [out.m4a]    download the waiting message's audio
+#   wokla unpair
+#
+# WOKLA_HOME      where the device key lives (default: ~/.config/wokla)
+# WOKLA_BASE_URL  the server (default: https://api.wokla.app)
+# WOKLA_VOICE     the `say` voice (default: Meijia)
+# WOKLA_LANGUAGE  the spoken language, for the transcriber (default: zh-TW)
+#
+# The key is this end of the pairing. Keep it out of git and chats; copy it
+# to move the pairing to another Mac, and never run `listen` on two at once.
+set -euo pipefail
+
+BASE="${WOKLA_BASE_URL:-https://api.wokla.app}"
+HOME_DIR="${WOKLA_HOME:-$HOME/.config/wokla}"
+VOICE="${WOKLA_VOICE:-Meijia}"
+LANGUAGE="${WOKLA_LANGUAGE:-zh-TW}"
+KEY_FILE="$HOME_DIR/key"
+
+usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+
+mkdir -p "$HOME_DIR"
+chmod 700 "$HOME_DIR"
+if [[ ! -s "$KEY_FILE" ]]; then
+  (umask 077; openssl rand -hex 32 >"$KEY_FILE")
+fi
+KEY="$(cat "$KEY_FILE")"
+
+# request METHOD PATH [curl args...] — prints "<status>\n<body>", never fails.
+request() {
+  local method="$1" path="$2"; shift 2
+  local out status
+  out="$(mktemp)"
+  status="$(curl -sS -m 30 -o "$out" -w '%{http_code}' -X "$method" \
+    -H "Authorization: Bearer $KEY" "$@" "$BASE$path" 2>/dev/null)" || status="000"
+  printf '%s\n' "$status"
+  cat "$out"
+  rm -f "$out"
+}
+
+# call METHOD PATH [curl args...] — prints the body; fails loudly on non-2xx.
+call() {
+  local reply status body
+  reply="$(request "$@")"
+  status="${reply%%$'\n'*}"
+  body="${reply#*$'\n'}"
+  [[ "$reply" == *$'\n'* ]] || body=""
+  if [[ "$status" != 2* ]]; then
+    echo "error: $1 $2 → HTTP $status $body" >&2
+    return 1
+  fi
+  printf '%s' "$body"
+}
+
+speak() {
+  local text="$1" work secs ms
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' RETURN
+  say -v "$VOICE" -o "$work/v.aiff" "$text"
+  afconvert -f m4af -d aac "$work/v.aiff" "$work/v.m4a"
+  secs="$(afinfo "$work/v.m4a" | awk '/estimated duration/ {print $3}')"
+  ms="$(awk -v s="$secs" 'BEGIN { printf "%d", s * 1000 + 0.5 }')"
+  if (( ms <= 0 || ms > 60000 )); then
+    echo "error: spoken length ${ms}ms is outside 1..60000; say less" >&2
+    return 1
+  fi
+  call POST /v1/pair/voice \
+    -F "file=@$work/v.m4a;type=audio/mp4" \
+    -F "duration_ms=$ms" \
+    -F "message_id=$(uuidgen)" \
+    -F "language=$LANGUAGE" \
+    -F "transcribe=true" >/dev/null
+  echo "sent, spoken (${ms}ms)"
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  pair)
+    code="${1:?usage: wokla pair <5-digit code>}"
+    call POST /v1/device >/dev/null
+    call POST /v1/pair/join -H 'Content-Type: application/json' \
+      -d "$(jq -nc --arg c "$code" '{code:$c}')" >/dev/null
+    echo "paired"
+    ;;
+  code)
+    call POST /v1/device >/dev/null
+    call POST /v1/pair/code | jq .
+    ;;
+  status)
+    call GET /v1/pair | jq .
+    ;;
+  listen)
+    # One line per message that is waiting and readable: unseen, and its
+    # words here unless none are coming. Repeats nothing; says an error once
+    # and its end once. Runs until killed.
+    last=""; err=""
+    while true; do
+      reply="$(request GET /v1/pair)"
+      status="${reply%%$'\n'*}"; body="${reply#*$'\n'}"
+      if [[ "$status" != 200 ]]; then
+        [[ "$err" != "$status" ]] && echo "ERROR http=$status $(head -c 200 <<<"$body")"
+        err="$status"
+      else
+        [[ -n "$err" ]] && echo "RECOVERED"
+        err=""
+        line="$(jq -r '
+          if (.paired | not) then "UNPAIRED"
+          elif (.inbound and (.inbound.seen | not)
+                and ((.inbound.has_words | not) or ((.inbound.transcript // "") != "")))
+          then "MESSAGE created_at=\(.inbound.created_at) has_voice=\(.inbound.has_voice // true) words=\(.inbound.transcript // "")"
+          else "" end' <<<"$body")"
+        if [[ -n "$line" && "$line" != "$last" ]]; then echo "$line"; fi
+        last="$line"
+      fi
+      sleep 10
+    done
+    ;;
+  send)
+    text="${1:?usage: wokla send \"<text>\"}"
+    reply="$(request POST /v1/pair/text -H 'Content-Type: application/json' \
+      -d "$(jq -nc --arg t "$text" --arg id "$(uuidgen)" '{text:$t, message_id:$id}')")"
+    status="${reply%%$'\n'*}"; body="${reply#*$'\n'}"
+    if [[ "$status" == 2* ]]; then
+      echo "sent, as words"
+    elif [[ "$status" == 404 && "$body" == *'"not_found"'* ]]; then
+      # A server from before words alone: the route is not there at all,
+      # which is not the same 404 as not_paired.
+      echo "note: this server does not take words alone yet; speaking it" >&2
+      speak "$text"
+    else
+      echo "error: POST /v1/pair/text → HTTP $status $body" >&2
+      exit 1
+    fi
+    ;;
+  say)
+    speak "${1:?usage: wokla say \"<text>\"}"
+    ;;
+  seen)
+    at="${1:?usage: wokla seen <created_at>}"
+    call POST /v1/pair/voice/seen -H 'Content-Type: application/json' \
+      -d "$(jq -nc --argjson a "$at" '{created_at:$a}')" >/dev/null
+    echo "seen $at"
+    ;;
+  fetch)
+    dest="${1:-$HOME_DIR/inbound.m4a}"
+    call GET /v1/pair/voice >"$dest"
+    echo "$dest"
+    ;;
+  unpair)
+    call DELETE /v1/pair >/dev/null
+    echo "unpaired"
+    ;;
+  ""|-h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
