@@ -1,6 +1,6 @@
 {
   "name": "wokla-plugin",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Pair a Claude session with a Wokla watch: read what the wrist says, answer it, mark it read.",
   "author": { "name": "Falcon" },
   "repository": "https://github.com/JarvisHo/wokla-plugin"

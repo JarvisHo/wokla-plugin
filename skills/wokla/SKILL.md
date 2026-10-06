@@ -52,6 +52,21 @@ it, paste it, or commit it.
 3. Then `wokla seen <created_at>`, naming the message you read.
 4. Tell the user what was said and what you sent.
 
+## Asking
+
+While the person is talking from the watch, they are not looking at this
+terminal. Anything that needs their answer — a question, a confirmation, a
+choice — goes to the watch, in the reply itself. The terminal is the
+record of what happened, never the only place a question was asked.
+
+- One message holds every question: the watch keeps only the latest, so a
+  second message replaces the first before it is read.
+- Ask few, and plainly enough to answer by voice in a word or two.
+- The words came through a transcriber and are sometimes wrong. When a
+  message could mean two things and one of them cannot be undone —
+  unpairing above all — ask on the watch, naming the exact word that means
+  yes, and act only on that.
+
 ## Listening
 
 To keep answering without being asked, run `wokla listen` under the
