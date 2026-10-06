@@ -17,8 +17,8 @@ Needs macOS. `curl`, `jq`, `say` and `afconvert` all ship with it.
 
 - `/wokla-plugin:pair 12345` pairs with the code the watch is showing. The
   code lives for 60 seconds.
-- `/wokla-plugin:listen` checks every 10 seconds and answers messages as
-  they arrive, for as long as the session is open.
+- `/wokla-plugin:listen` checks every 10 seconds (`WOKLA_INTERVAL`) and
+  answers messages as they arrive, for as long as the session is open.
 - Or just ask: "看一下手錶", "reply to the watch".
 
 The `wokla` command is on PATH while the plugin is enabled. Run
@@ -43,3 +43,4 @@ with that watch. It is made on first use and never leaves that file.
 | `WOKLA_BASE_URL` | `https://api.wokla.app` |
 | `WOKLA_VOICE` | `Meijia` (`say -v '?'` lists the rest) |
 | `WOKLA_LANGUAGE` | `zh-TW` |
+| `WOKLA_INTERVAL` | `10` seconds between polls while listening; anything below 2 is raised to 2 |

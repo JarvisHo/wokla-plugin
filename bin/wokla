@@ -4,7 +4,8 @@
 #   wokla pair <code>        join the 5-digit code the watch is showing
 #   wokla code               ask for a code to type on the watch instead
 #   wokla status             the pair status, as JSON
-#   wokla listen             poll every 10s; one line per message waiting
+#   wokla listen             poll every WOKLA_INTERVAL seconds; one line
+#                            per message waiting
 #   wokla send "<text>"      send words; spoken instead if the server
 #                            does not take words alone yet
 #   wokla say "<text>"       speak the text and send the recording
@@ -16,6 +17,7 @@
 # WOKLA_BASE_URL  the server (default: https://api.wokla.app)
 # WOKLA_VOICE     the `say` voice (default: Meijia)
 # WOKLA_LANGUAGE  the spoken language, for the transcriber (default: zh-TW)
+# WOKLA_INTERVAL  seconds between polls in `listen` (default: 10, at least 2)
 #
 # The key is this end of the pairing. Keep it out of git and chats; copy it
 # to move the pairing to another Mac, and never run `listen` on two at once.
@@ -25,9 +27,14 @@ BASE="${WOKLA_BASE_URL:-https://api.wokla.app}"
 HOME_DIR="${WOKLA_HOME:-$HOME/.config/wokla}"
 VOICE="${WOKLA_VOICE:-Meijia}"
 LANGUAGE="${WOKLA_LANGUAGE:-zh-TW}"
+# Whole seconds. The floor is the server's: it allows 120 polls a minute per
+# device, and two seconds keeps well clear of that while a listener on
+# another Mac or a stray `status` shares the same budget.
+INTERVAL="${WOKLA_INTERVAL:-10}"
+MIN_INTERVAL=2
 KEY_FILE="$HOME_DIR/key"
 
-usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; }
 
 mkdir -p "$HOME_DIR"
 chmod 700 "$HOME_DIR"
@@ -103,6 +110,15 @@ case "$cmd" in
     # One line per message that is waiting and readable: unseen, and its
     # words here unless none are coming. Repeats nothing; says an error once
     # and its end once. Runs until killed.
+    if [[ ! "$INTERVAL" =~ ^[0-9]+$ ]]; then
+      echo "error: WOKLA_INTERVAL must be whole seconds, got '$INTERVAL'" >&2
+      exit 2
+    fi
+    if (( INTERVAL < MIN_INTERVAL )); then
+      # Stderr: stdout is the event stream, and this is not a message.
+      echo "note: WOKLA_INTERVAL=$INTERVAL is below ${MIN_INTERVAL}s; using ${MIN_INTERVAL}s" >&2
+      INTERVAL=$MIN_INTERVAL
+    fi
     last=""; err=""
     while true; do
       reply="$(request GET /v1/pair)"
@@ -122,7 +138,7 @@ case "$cmd" in
         if [[ -n "$line" && "$line" != "$last" ]]; then echo "$line"; fi
         last="$line"
       fi
-      sleep 10
+      sleep "$INTERVAL"
     done
     ;;
   send)

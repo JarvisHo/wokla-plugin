@@ -14,7 +14,7 @@ command, which is on PATH while this plugin is enabled.
 | | |
 | --- | --- |
 | `wokla status` | Pair status as JSON: `paired`, `inbound`, `outbound` |
-| `wokla listen` | Polls every 10 s. Prints one line per message waiting, and nothing otherwise |
+| `wokla listen` | Polls every `WOKLA_INTERVAL` seconds (10 by default, 2 at least). Prints one line per message waiting, and nothing otherwise |
 | `wokla send "<text>"` | Sends the words. Falls back to speech on a server that does not take words alone yet |
 | `wokla say "<text>"` | Speaks the text and sends the recording |
 | `wokla seen <created_at>` | Reports a message as read |
