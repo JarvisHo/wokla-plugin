@@ -68,6 +68,9 @@ everything twice.
 
 ## Pairing
 
+Unpairing tells the watch and cannot be undone from here, so confirm with
+the user first, and stop any `wokla listen` monitor before `wokla unpair`.
+
 The watch shows a 5-digit code that lives for 60 seconds. Run
 `wokla pair <code>` the moment the user gives it to you. Wrong guesses are
 rate-limited, so do not try variations of a code that failed — ask for a

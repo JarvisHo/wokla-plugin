@@ -19,6 +19,8 @@ Needs macOS. `curl`, `jq`, `say` and `afconvert` all ship with it.
   code lives for 60 seconds.
 - `/wokla-plugin:listen` checks every 10 seconds (`WOKLA_INTERVAL`) and
   answers messages as they arrive, for as long as the session is open.
+- `/wokla-plugin:unpair` ends the pairing, after asking. The watch is told,
+  and pairing again needs a new code.
 - Or just ask: "看一下手錶", "reply to the watch".
 
 The `wokla` command is on PATH while the plugin is enabled. Run
